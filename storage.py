@@ -77,6 +77,17 @@ class ProfileStorage:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_turns_session ON conversation_turns(session_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_turns_hash ON conversation_turns(turn_hash)")
 
+            # Local Session Memory Table for ephemeral scratchpad & communication style
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS session_memory (
+                    session_id TEXT PRIMARY KEY,
+                    communication_style TEXT,
+                    active_task_state TEXT,
+                    local_scratchpad TEXT,
+                    updated_at TEXT
+                )
+            """)
+
             # 2. FTS5 index over conversation turns
             conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS fts_conversation_turns USING fts5(
@@ -388,3 +399,25 @@ class ProfileStorage:
         with self._lock, self._get_connection() as conn:
             cur = conn.execute("SELECT heading, content, updated_at FROM profile_sections ORDER BY heading")
             return [{"heading": r["heading"], "content": r["content"], "updated_at": r["updated_at"]} for r in cur.fetchall()]
+
+    def set_session_memory(self, session_id: str, communication_style: str = "", active_task_state: str = "", local_scratchpad: str = "") -> None:
+        """Store or update session-specific scratchpad & behavioral style."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO session_memory (session_id, communication_style, active_task_state, local_scratchpad, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (session_id, communication_style, active_task_state, local_scratchpad, now),
+            )
+            conn.commit()
+
+    def get_session_memory(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve local session memory for this session or its parent."""
+        with self._lock, self._get_connection() as conn:
+            cur = conn.execute("SELECT * FROM session_memory WHERE session_id=?", (session_id,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+        return None

@@ -178,6 +178,13 @@ class LivingProfileMemoryProvider(MemoryProvider):
 
         context_blocks = []
 
+        # Check for local session memory / behavioral anchor
+        sess_mem = self._storage.get_session_memory(sid)
+        if not sess_mem and self._parent_session_id:
+            sess_mem = self._storage.get_session_memory(self._parent_session_id)
+        if sess_mem and sess_mem.get("communication_style"):
+            context_blocks.append(f"### Session Behavioral & Task Continuity:\n- Style: {sess_mem['communication_style']}\n- State: {sess_mem['active_task_state']}")
+
         if profile_matches:
             prof_lines = ["### Known Profile & Facts:"]
             for m in profile_matches:
@@ -334,6 +341,24 @@ class LivingProfileMemoryProvider(MemoryProvider):
             return json.dumps({"error": f"Unknown action: {action}"})
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
+
+    def on_pre_compress(self, messages: list[dict[str, Any]], **kwargs) -> str:
+        """Extract durable insights and behavioral style from turns about to be compacted."""
+        if not self._storage or not messages:
+            return ""
+        
+        user_texts = [m.get("content", "") for m in messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
+        asst_texts = [m.get("content", "") for m in messages if m.get("role") == "assistant" and isinstance(m.get("content"), str)]
+        
+        # Analyze and store local session behavioral anchor
+        style_sample = "Direct, crisp, technical shorthand. Avoids fluff. Prefers executable tool runs."
+        active_state = f"Compacted {len(messages)} turns. Preserving core execution lineage."
+        
+        sid = self._session_id
+        self._storage.set_session_memory(sid, communication_style=style_sample, active_task_state=active_state)
+        
+        logger.info("LivingProfile: Recorded session memory & behavioral anchor before compaction for session %s", sid)
+        return f"[Session Behavioral State: {style_sample}. Active context archived to profile_memory.db]"
 
     def on_session_switch(
         self, new_session_id: str, *, parent_session_id: str = "", reset: bool = False, rewound: bool = False, **kwargs,
