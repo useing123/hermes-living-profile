@@ -1,0 +1,19 @@
+name: living_profile
+version: 1.0.0
+description: "Living Profile Memory Provider: Full conversation turn archiving + FTS5 search + self-compiling living Markdown profile."
+author: Nous Research
+tier: community
+category: memory
+requires_hermes: ">=0.20.0"
+platforms: []
+capabilities:
+  provides_tools:
+  - profile_view
+  - profile_search
+  - profile_update
+  - memory_control
+  provides_hooks:
+    - system_prompt_block
+    - prefetch
+    - sync_turn
+    - on_turn_start
