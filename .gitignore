@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+profile_memory.db
+PROFILE.md
